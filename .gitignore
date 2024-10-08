@@ -1,0 +1,70 @@
+# Custom Add
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual Environment
+venv/
+env/
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Operating System
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Snowflake and Jetsons specific
+*.snowsql
+*.snowsql_history
+
+# Sensitive Information
+.env.*
+!.env.example
+config.yaml
+
+# Temporary files
+*.tmp
+*.bak
+
+# Compiled files
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.out
+
+# Package files
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Database
+*.sqlite
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pytest
+.pytest_cache/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
