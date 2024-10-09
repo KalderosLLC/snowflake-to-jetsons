@@ -10,7 +10,7 @@ from jetson_connection import JetsonDatasource
 # Set the logging level
 logging.basicConfig(level=logging.INFO)
 
-# Determine the environment (default to 'development' if not set)
+# Determine the environment (default to 'test' if not set)
 env = os.getenv('APP_ENV', 'test')
 
 # Load the correct .env file based on the environment
