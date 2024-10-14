@@ -1,79 +1,103 @@
 import logging
 import os
-import pyodbc
+import argparse
 from dotenv import load_dotenv
 from snowflake.connector import connect as snowflake_connect
 from sqlalchemy import create_engine
 from snowflake_connection import SnowflakeDatasource
 from jetson_connection import JetsonDatasource
 
-# Set the logging level
-logging.basicConfig(level=logging.INFO)
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-# Determine the environment (default to 'test' if not set)
-env = os.getenv('APP_ENV', 'test')
+def load_environment_variables(env):
+    env_file = f".env.{env}"
+    if not os.path.exists(env_file):
+        raise FileNotFoundError(f"Environment file not found: {env_file}")
+    
+    load_dotenv(env_file)
+    logger.info(f"Loaded environment variables from {env_file}")
+    
+    required_vars = [
+        'SNOWFLAKE_ACCOUNT', 'SNOWFLAKE_WAREHOUSE', 'SNOWFLAKE_DATABASE', 'SNOWFLAKE_ROLE',
+        'OKTA_USERNAME', 'OKTA_PASSWORD', 'KWEB_SERVER', 'KWEB_DATABASE',
+        'JETSONS_USERNAME', 'JETSONS_PASSWORD', 'JETSONS_USER_ID'
+    ]
+    for var in required_vars:
+        if not os.getenv(var):
+            raise EnvironmentError(f"Missing required environment variable: {var}")
+    logger.info("All required environment variables are present")
 
-# Load the correct .env file based on the environment
-dotenv_file = f'.env.{env}'
-load_dotenv(dotenv_file)
+def create_snowflake_engine():
+    try:
+        snowflake_conn = snowflake_connect(
+            account=os.getenv('SNOWFLAKE_ACCOUNT'),
+            user=os.getenv('OKTA_USERNAME'),
+            password=os.getenv('OKTA_PASSWORD'),
+            warehouse=os.getenv('SNOWFLAKE_WAREHOUSE'),
+            database=os.getenv('SNOWFLAKE_DATABASE'),
+            role=os.getenv('SNOWFLAKE_ROLE')
+        )
+        logger.info("Snowflake connection created successfully")
+        return snowflake_conn
+    except Exception as e:
+        logger.error(f"Failed to create Snowflake connection: {str(e)}")
+        raise
 
-# Load environment variables from .env
-load_dotenv()
-snowflake_account = os.getenv("SNOWFLAKE_ACCOUNT")
-snowflake_warehouse = os.getenv("SNOWFLAKE_WAREHOUSE")
-snowflake_role = os.getenv('SNOWFLAKE_ROLE')
-snowflake_database = os.getenv('SNOWFLAKE_DATABASE')
-okta_username = os.getenv('OKTA_USERNAME')
-snowflake_password = os.getenv('OKTA_PASSWORD')
-kweb_server = os.getenv('KWEB_SERVER')
-kweb_database = os.getenv('KWEB_DATABASE')
-jetson_username = os.getenv('JETSONS_USERNAME')
-jetson_password = os.getenv('JETSONS_PASSWORD')
-jetson_user_id = os.getenv('JETSONS_USER_ID')
+def create_sql_server_engine():
+    try:
+        connection_string = (
+            f"mssql+pyodbc://{os.getenv('JETSONS_USERNAME')}:{os.getenv('JETSONS_PASSWORD')}@"
+            f"{os.getenv('KWEB_SERVER')}/{os.getenv('KWEB_DATABASE')}?driver=ODBC+Driver+17+for+SQL+Server"
+        )
+        sql_server_engine = create_engine(connection_string)
+        logger.info("SQL Server engine created successfully")
+        return sql_server_engine
+    except Exception as e:
+        logger.error(f"Failed to create SQL Server engine: {str(e)}")
+        raise
 
-# DB connections
-## Connect to Snowflake
-snowflake_conn = snowflake_connect(
-    account=snowflake_account,
-    user=okta_username,
-    password=snowflake_password,
-    warehouse=snowflake_warehouse,
-    role=snowflake_role,
-    database=snowflake_database
-)
+def main(env):
+    try:
+        load_environment_variables(env)
+        
+        snowflake_conn = create_snowflake_engine()
+        sql_server_engine = create_sql_server_engine()
 
-## Connect to Jetsons
-# Create SQL engine
-sql_server_engine = create_engine(f"mssql+pyodbc://{jetson_username}:{jetson_password}@{kweb_server}/{kweb_database}?driver=ODBC+Driver+17+for+SQL+Server")
+        snowflake_datasource = SnowflakeDatasource(snowflake_conn, os.getenv('SNOWFLAKE_DATABASE'))
+        jetson_datasource = JetsonDatasource(sql_server_engine, os.getenv('JETSONS_USER_ID'))
 
-# Create a SnowflakeDataSource object
-snowflake_ds = SnowflakeDatasource(snowflake_conn, snowflake_database)
+        logger.info(f"Starting data transfer process in {env} environment")
 
-# Create a JetsonDatasource object
-jetson_ds = JetsonDatasource(sql_server_engine, jetson_user_id)
+        # Covered Entities
+        covered_entities_df = snowflake_datasource.get_covered_entities()
+        logger.info(f"Retrieved {len(covered_entities_df)} covered entities from Snowflake")
+        result = jetson_datasource.insert_covered_entities(covered_entities_df)
+        if result is not None:
+            logger.info("Covered entities inserted successfully")
+        else:
+            logger.warning("No covered entities were inserted")
 
-def main():
-    # Get and clean covered entities
-    covered_entities_df = snowflake_ds.get_covered_entities()
+        # CE Parents
+        ce_parents_df = snowflake_datasource.get_ce_parents()
+        logger.info(f"Retrieved {len(ce_parents_df)} CE parents from Snowflake")
+        result = jetson_datasource.insert_ce_parents(ce_parents_df)
+        if result is not None:
+            logger.info("CE parents inserted successfully")
+        else:
+            logger.warning("No CE parents were inserted")
 
-    # Get and clean covered entity identifiers
-    # covered_entity_identifiers_df = snowflake_ds.get_covered_entity_identifiers()
+        logger.info("Data transfer process completed successfully")
 
-    # Insert covered entities
-    jetson_ds.insert_covered_entities(covered_entities_df)
-
-    # Insert covered entity identifiers
-    # jetson_ds.insert_covered_entity_identifiers(covered_entity_identifiers_df)
-
-    # Get and clean ce parents
-    ce_parents_df = snowflake_ds.get_ce_parents()
-
-    # Insert ce parents
-    jetson_ds.insert_ce_parents(ce_parents_df)
+    except Exception as e:
+        logger.error(f"An error occurred during the data transfer process: {str(e)}")
+        raise
 
 if __name__ == "__main__":
-    main()
-
-
-
-
+    parser = argparse.ArgumentParser(description="Run the data transfer process with specified environment.")
+    parser.add_argument('--env', choices=['test', 'production'], default='test',
+                        help="Specify the environment to use (test or production)")
+    args = parser.parse_args()
+    
+    main(args.env)
