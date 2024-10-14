@@ -1,55 +1,55 @@
-# Snowflake to Jetsons
+# Snowflake to Jetsons Data Transfer
 
-This repository contains code for migrating data from Snowflake to Jetsons.
+This project facilitates the transfer of data from Snowflake to a SQL Server database (Jetsons). It handles covered entities and their parent-child relationships.
 
-## Overview
+## Recent Enhancements
 
-The Snowflake to Jetsons project is designed to facilitate the transfer of data from a Snowflake database to a Jetsons system. This migration tool aims to streamline the process of moving data between these two platforms, ensuring data integrity and efficiency.
+1. **Environment-specific configurations**: The script now supports separate configurations for test and production environments using `.env.test` and `.env.production` files.
 
-## Features
+2. **Duplicate record handling**: The `insert_ce_parents` function now checks for existing records before insertion, preventing duplicate entries in the `ceparentchild` table.
 
-- Extracts data from Snowflake tables
-- Transforms data to fit Jetsons schema
-- Loads data into Jetsons system
-- Supports incremental data updates
-- Provides error handling and logging
+3. **Batch processing**: Large datasets are now processed in batches to improve performance and reduce memory usage.
 
-## Getting Started
+4. **Improved logging**: The script now uses Python's logging module for better tracking of the data transfer process.
 
-### Prerequisites
+## Prerequisites
 
 - Python 3.7+
-- Snowflake account and credentials
-- Jetsons account and API access
+- Required Python packages (see `requirements.txt`)
+- Access to Snowflake and SQL Server databases
+- ODBC Driver 17 for SQL Server
 
-### Installation
+## Setup
 
-1. Clone the repository:
-   ```
-   git clone https://github.com/your-username/snowflake-to-jetsons.git
-   ```
-
-2. Install required dependencies:
+1. Clone this repository.
+2. Install the required packages:
    ```
    pip install -r requirements.txt
    ```
+3. Set up your environment files:
+   - Create `.env.test` for the test environment
+   - Create `.env.production` for the production environment
 
-3. Configure your Snowflake and Jetsons credentials in the `config.yaml` file.
+   Both files should contain the following variables:
+   ```
+   SNOWFLAKE_ACCOUNT=your_snowflake_account
+   SNOWFLAKE_WAREHOUSE=your_snowflake_warehouse
+   SNOWFLAKE_DATABASE=your_snowflake_database
+   SNOWFLAKE_ROLE=your_snowflake_role
+   OKTA_USERNAME=your_okta_username
+   OKTA_PASSWORD=your_okta_password
+   KWEB_SERVER=your_kweb_server
+   KWEB_DATABASE=your_kweb_database
+   JETSONS_USERNAME=your_jetsons_username
+   JETSONS_PASSWORD=your_jetsons_password
+   JETSONS_USER_ID=your_jetsons_user_id
+   ```
 
-### Usage
+## Usage
 
-Run the main script to start the migration:
+Run the script with the following command:
+The test env is selected by default.
 ```
-python main.py
+python main.py --env {test|production}
 ```
 
-### Configuration
-
-The `.env` file contains the following configurations:
-
-- `SNOWFLAKE_ACCOUNT`: Snowflake account
-- `SNOWFLAKE_WAREHOUSE`: Snowflake warehouse
-- `SNOWFLAKE_DATABASE`: Snowflake database
-- `SNOWFLAKE_ROLE`: Snowflake role
-- `JETSONS_USERNAME`: Jetsons username
-- `JETSONS_PASSWORD`: Jetsons password
